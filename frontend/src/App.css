@@ -1,0 +1,51 @@
+/* Color Scheme */
+:root {
+  --primary-color: #1a1a8c;
+  --secondary-color: #2d2dce;
+  --accent-color: #4f4ff0;
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --info-color: #3b82f6;
+  --white: #ffffff;
+  --light-grey: #f3f4f6;
+  --medium-grey: #e5e7eb;
+  --dark-grey: #6b7280;
+  --text-dark: #111827;
+  --text-light: #6b7280;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  background-color: var(--light-grey);
+  color: var(--text-dark);
+  line-height: 1.6;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  margin-top: 70px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+    margin-top: 60px;
+  }
+}
