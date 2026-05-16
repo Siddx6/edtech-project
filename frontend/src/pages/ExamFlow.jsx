@@ -399,6 +399,11 @@ function ExamFlow() {
                   {analysisResult.ai_recommendation?.suggested_goal || "Not available"}
                 </li>
               </ul>
+              {analysisResult.needs_manual_review && (
+                <div style={{ marginTop: 16, padding: "12px", backgroundColor: "#fff3cd", color: "#856404", borderRadius: "4px", border: "1px solid #ffeeba", fontSize: "14px" }}>
+                  ⚠️ <strong>Note:</strong> The handwriting was difficult to read. This score may need manual review.
+                </div>
+              )}
             </div>
           )}
           <Button

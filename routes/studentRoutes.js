@@ -20,6 +20,10 @@ router.post("/student/create", async (req, res) => {
     const normalizedSchool = String(req.body?.school || "").trim();
     const normalizedClass = normalizeClassLabel(req.body?.class);
 
+    if (normalizedName.length > 100 || normalizedSchool.length > 200 || String(req.body?.class || "").length > 50) {
+      return res.status(400).json({ success: false, message: "Input fields exceed maximum allowed length." });
+    }
+
     let student = await Student.findOne({
       name: normalizedName,
       class: buildClassMatcher(normalizedClass),
@@ -48,9 +52,9 @@ router.post("/student/create", async (req, res) => {
   }
 });
 
-router.get("/student/:name", async (req, res) => {
+router.get("/student/:id", async (req, res) => {
   try {
-    const student = await Student.findOne({ name: req.params.name });
+    const student = await Student.findById(req.params.id);
     if (!student) {
       return res
         .status(404)

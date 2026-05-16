@@ -69,6 +69,11 @@ function StudentResult() {
     <div className="student-result-container">
       <div className="score-section">
         <Card className="score-card no-hover">
+          {result.needsManualReview && (
+            <div style={{ backgroundColor: "#fff3cd", color: "#856404", padding: "8px 12px", textAlign: "center", marginBottom: 16, borderRadius: 4, fontSize: 14, border: "1px solid #ffeeba" }}>
+              ⚠️ <strong>Low Confidence:</strong> Handwriting was difficult to read. Results may require manual verification.
+            </div>
+          )}
           <div className="score-display">
             <div className="score-circle">
               <div className="score-inner">
@@ -284,6 +289,7 @@ function buildResultViewModel(resultData, examMeta, examId) {
     strongTopics: strongTopics.slice(0, 6),
     weakTopics: (weakTopics.length > 0 ? weakTopics : priorityTopics).slice(0, 6),
     suggestedGoal,
+    needsManualReview: Boolean(resultData.needs_manual_review),
     insights: buildInsights({
       strongTopics,
       weakTopics,

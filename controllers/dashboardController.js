@@ -6,48 +6,56 @@ import { buildClassMatcher, normalizeClassLabel } from "../utils/classUtils.js";
 
 export async function getStudentsList(_req, res) {
   try {
-    const [students, exams, papers, topicHealthDocs] = await Promise.all([
-      Student.find().sort({ created_at: -1 }).lean(),
-      Exam.find().sort({ exam_date: -1 }).lean(),
-      GeneratedPaper.find().select("_id class").lean(),
-      TopicHealth.find().sort({ updatedAt: -1 }).lean(),
+    const [students, papersAgg] = await Promise.all([
+      Student.aggregate([
+        {
+          $lookup: {
+            from: "exams",
+            let: { studentId: { $toString: "$_id" } },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$student_id", "$$studentId"] } } },
+              { $sort: { exam_date: -1 } }
+            ],
+            as: "exams"
+          }
+        },
+        {
+          $lookup: {
+            from: "topichealths",
+            let: { studentId: { $toString: "$_id" } },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$student_id", "$$studentId"] } } },
+              { $sort: { updatedAt: -1 } },
+              { $limit: 1 }
+            ],
+            as: "latestTopicHealth"
+          }
+        },
+        { $sort: { created_at: -1 } }
+      ]),
+      GeneratedPaper.aggregate([
+        { $group: { _id: "$class", count: { $sum: 1 } } }
+      ])
     ]);
 
-    const examsByStudent = groupById(exams, "student_id");
-    const paperCountByClass = papers.reduce((accumulator, paper) => {
-      const key = normalizeClassLabel(paper.class);
-      if (key) {
-        accumulator.set(key, (accumulator.get(key) || 0) + 1);
-      }
-
-      return accumulator;
-    }, new Map());
-    const latestTopicHealthByStudent = new Map();
-
-    for (const topicHealthDoc of topicHealthDocs) {
-      const studentId = String(topicHealthDoc.student_id || "");
-      if (!studentId || latestTopicHealthByStudent.has(studentId)) {
-        continue;
-      }
-
-      latestTopicHealthByStudent.set(studentId, topicHealthDoc);
-    }
+    const paperCountByClass = new Map(
+      papersAgg.map(agg => [normalizeClassLabel(agg._id) || agg._id, agg.count])
+    );
 
     const studentList = students.map((student) => {
-      const studentId = String(student._id);
-      const studentExams = examsByStudent.get(studentId) || [];
+      const studentExams = student.exams || [];
       const latestExam = studentExams[0] || null;
       const averagePercentage = calculateAveragePercentage(studentExams);
-      const topicHealthDoc = latestTopicHealthByStudent.get(studentId) || null;
+      const topicHealthDoc = student.latestTopicHealth?.[0] || null;
+      const normalizedClass = normalizeClassLabel(student.class) || student.class;
 
       return {
         id: student._id,
         name: student.name,
-        class: normalizeClassLabel(student.class) || student.class,
+        class: normalizedClass,
         school: student.school,
         exam_count: studentExams.length,
-        available_papers:
-          paperCountByClass.get(normalizeClassLabel(student.class)) || 0,
+        available_papers: paperCountByClass.get(normalizedClass) || 0,
         average_percentage: averagePercentage,
         latest_exam: latestExam ? serializeExamSummary(latestExam) : null,
         subjects: [...new Set(studentExams.map((exam) => exam.subject).filter(Boolean))],
@@ -188,30 +196,109 @@ export async function getStudentOverview(req, res) {
 
 export async function getTeacherAnalytics(_req, res) {
   try {
-    const [papers, students, exams] = await Promise.all([
+    const [
+      totalPapers,
+      totalStudents,
+      totalExams,
+      papersBySubjectAgg,
+      papersByClassAgg,
+      performanceBySubjectAgg,
+      recentPapers,
+      recentExams,
+      topStudentsAgg
+    ] = await Promise.all([
+      GeneratedPaper.countDocuments(),
+      Student.countDocuments(),
+      Exam.countDocuments(),
+      GeneratedPaper.aggregate([
+        { $group: { _id: "$subject", count: { $sum: 1 } } }
+      ]),
+      GeneratedPaper.aggregate([
+        { $group: { _id: "$class", count: { $sum: 1 } } }
+      ]),
+      Exam.aggregate([
+        { $sort: { exam_date: -1 } },
+        {
+          $group: {
+            _id: "$subject",
+            exam_count: { $sum: 1 },
+            average_percentage: { $avg: "$percentage" },
+            latest_percentage: { $first: "$percentage" }
+          }
+        }
+      ]),
       GeneratedPaper.find()
         .sort({ created_at: -1 })
-        .select(
-          "_id title subject exam_type class total_marks num_questions duration format created_at",
-        )
+        .limit(5)
+        .select("_id title subject class created_at")
         .lean(),
-      Student.find().sort({ created_at: -1 }).lean(),
-      Exam.find().sort({ exam_date: -1 }).lean(),
+      Exam.find()
+        .sort({ exam_date: -1 })
+        .limit(5)
+        .select("_id subject exam_type percentage total_marks exam_date")
+        .lean(),
+      Student.aggregate([
+        {
+          $lookup: {
+            from: "exams",
+            let: { studentId: { $toString: "$_id" } },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$student_id", "$$studentId"] } } },
+              { $project: { percentage: 1 } }
+            ],
+            as: "exams"
+          }
+        },
+        {
+          $addFields: {
+            exam_count: { $size: "$exams" },
+            average_percentage: { $avg: "$exams.percentage" }
+          }
+        },
+        { $match: { exam_count: { $gt: 0 } } },
+        { $sort: { average_percentage: -1, exam_count: -1 } },
+        { $limit: 5 },
+        { $project: { _id: 1, name: 1, class: 1, exam_count: 1, average_percentage: 1 } }
+      ])
     ]);
 
-    const papersBySubject = countByField(papers, "subject");
-    const papersByClass = countByField(papers, "class");
-    const performanceBySubject = buildSubjectBreakdown(exams);
-    const averageScore = calculateAveragePercentage(exams);
+    const papersBySubject = papersBySubjectAgg.map(agg => ({
+      label: String(agg._id || "").trim(),
+      count: agg.count
+    })).filter(item => item.label);
+
+    const papersByClass = papersByClassAgg.map(agg => ({
+      label: normalizeClassLabel(agg._id) || agg._id,
+      count: agg.count
+    })).filter(item => item.label);
+
+    // Re-combine and normalize classes if there were duplicates due to case/spacing before normalization
+    const normalizedPapersByClass = Object.values(papersByClass.reduce((acc, curr) => {
+      acc[curr.label] = acc[curr.label] || { label: curr.label, count: 0 };
+      acc[curr.label].count += curr.count;
+      return acc;
+    }, {}));
+
+    const performanceBySubject = performanceBySubjectAgg.map(agg => ({
+      subject: String(agg._id || "").trim(),
+      exam_count: agg.exam_count,
+      average_percentage: Number((agg.average_percentage || 0).toFixed(2)),
+      latest_percentage: agg.latest_percentage ?? null
+    })).filter(item => item.subject);
+
+    const averageScore = performanceBySubject.length > 0
+      ? Number((performanceBySubject.reduce((sum, s) => sum + s.average_percentage, 0) / performanceBySubject.length).toFixed(2))
+      : 0;
+
     const recentActivity = [
-      ...papers.slice(0, 5).map((paper) => ({
+      ...recentPapers.map((paper) => ({
         id: `paper-${paper._id}`,
         type: "paper",
         title: paper.title,
         subtitle: `${paper.subject} | ${normalizeClassLabel(paper.class) || paper.class}`,
         timestamp: paper.created_at,
       })),
-      ...exams.slice(0, 5).map((exam) => ({
+      ...recentExams.map((exam) => ({
         id: `exam-${exam._id}`,
         type: "exam",
         title: `${exam.subject} ${exam.exam_type}`,
@@ -219,45 +306,29 @@ export async function getTeacherAnalytics(_req, res) {
         timestamp: exam.exam_date,
       })),
     ]
-      .sort(
-        (left, right) =>
-          new Date(right.timestamp || 0).getTime() - new Date(left.timestamp || 0).getTime(),
-      )
+      .sort((left, right) => new Date(right.timestamp || 0).getTime() - new Date(left.timestamp || 0).getTime())
       .slice(0, 8);
 
-    const examsByStudent = groupById(exams, "student_id");
-    const topStudents = students
-      .map((student) => {
-        const studentExams = examsByStudent.get(String(student._id)) || [];
-
-        return {
-          id: student._id,
-          name: student.name,
-          class: normalizeClassLabel(student.class) || student.class,
-          exam_count: studentExams.length,
-          average_percentage: calculateAveragePercentage(studentExams),
-        };
-      })
-      .filter((student) => student.exam_count > 0)
-      .sort(
-        (left, right) =>
-          right.average_percentage - left.average_percentage ||
-          right.exam_count - left.exam_count,
-      )
-      .slice(0, 5);
+    const topStudents = topStudentsAgg.map((student) => ({
+      id: student._id,
+      name: student.name,
+      class: normalizeClassLabel(student.class) || student.class,
+      exam_count: student.exam_count,
+      average_percentage: Number((student.average_percentage || 0).toFixed(2)),
+    }));
 
     return res.status(200).json({
       success: true,
       data: {
         summary: {
-          total_papers: papers.length,
-          total_students: students.length,
-          analyzed_exams: exams.length,
+          total_papers: totalPapers,
+          total_students: totalStudents,
+          analyzed_exams: totalExams,
           average_score: averageScore,
-          pdf_papers: papers.length,
+          pdf_papers: totalPapers,
         },
         papers_by_subject: papersBySubject,
-        papers_by_class: papersByClass,
+        papers_by_class: normalizedPapersByClass,
         performance_by_subject: performanceBySubject,
         recent_activity: recentActivity,
         top_students: topStudents,

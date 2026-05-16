@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import { analyzeExam } from "../controllers/examController.js";
+import fs from "fs";
 import {
   generatePaper,
   getAllPapers,
@@ -34,8 +35,19 @@ const allowedExamFileExtensions = new Set([
 
 const allowedExamFileFormatsLabel = "PDF, JPG, JPEG, PNG, WEBP, HEIC, HEIF";
 
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname || ''));
+    }
+  }),
   limits: {
     files: 2,
     fileSize: 20 * 1024 * 1024,

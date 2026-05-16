@@ -22,7 +22,7 @@ function GenerateTestPaper() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const examTypes = ["UT-1", "UT-2", "Mid-Term", "Final Exam", "Seasonal Exam"];
+  const examTypes = ["UT-1", "UT-2", "Mid-Term", "Final Exam", "Sessional Exam"];
   const classes = [
     "Class 6",
     "Class 7",
@@ -116,7 +116,9 @@ function GenerateTestPaper() {
     <div className="generate-paper-container">
       <div className="page-header">
         <h1 className="page-title">Generate Test Paper</h1>
-        <p className="page-subtitle">Create a new PDF exam paper using AI assistance</p>
+        <p className="page-subtitle">
+          Create a new PDF exam paper using AI assistance
+        </p>
       </div>
 
       <Card className="form-card">
@@ -266,7 +268,7 @@ function GenerateTestPaper() {
                 value={formData.totalMarks}
                 onChange={handleInputChange}
                 className="form-input"
-                min="5"
+                min="1"
                 max="80"
                 required
               />
@@ -293,7 +295,8 @@ function GenerateTestPaper() {
           <div className="info-note">
             <Zap size={16} />
             <span>
-              Paper will be generated as a PDF using AI based on CBSE/NCERT curriculum
+              Paper will be generated as a PDF using AI based on CBSE/NCERT
+              curriculum
             </span>
           </div>
 

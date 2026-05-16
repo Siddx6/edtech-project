@@ -27,7 +27,7 @@ export async function getStudentHistory({
   await student.populate({
     path: "exams",
     match: subject ? { subject } : {},
-    options: { sort: { exam_date: 1 } },
+    options: { sort: { exam_date: 1 }, limit: 15 },
   });
 
   await student.populate({
@@ -116,7 +116,7 @@ export async function getPracticeQuizContext({
   await student.populate({
     path: "exams",
     match: { subject },
-    options: { sort: { exam_date: -1 } },
+    options: { sort: { exam_date: -1 }, limit: 15 },
   });
 
   await student.populate({
@@ -249,11 +249,7 @@ export async function saveExamAnalysis({
 
     await student.save();
   } else {
-    student = await Student.create({
-      name: studentName,
-      class: studentClass,
-      school: studentSchool,
-    });
+    throw new Error(`Student Not Found: Cannot save exam for unregistered student '${studentName}' in class '${studentClass}'`);
   }
 
   const topicHealthSnapshot = normalizeTopicHealth(finalAnalysis.topic_health);

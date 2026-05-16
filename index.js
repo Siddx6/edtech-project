@@ -1,14 +1,16 @@
 import express from "express";
 import mongoose from "mongoose";
+import "./utils/loadEnv.js";
 import examRoutes from "./routes/examRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));
 
 // CORS middleware
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:3000");
+  const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:3000";
+  res.header("Access-Control-Allow-Origin", allowedOrigin);
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {

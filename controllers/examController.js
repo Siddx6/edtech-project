@@ -6,6 +6,7 @@ import {
   saveExamAnalysis,
 } from "../services/dbService.js";
 import { normalizeClassLabel } from "../utils/classUtils.js";
+import fs from "fs";
 
 export async function analyzeExam(req, res) {
   try {
@@ -22,9 +23,19 @@ export async function analyzeExam(req, res) {
 
     console.log("Step 1: Sending files to Gemini for extraction...");
 
+    const questionPaperBuffer = fs.readFileSync(questionPaperFile.path);
+    const answerSheetBuffer = fs.readFileSync(answerSheetFile.path);
+
+    try {
+      fs.unlinkSync(questionPaperFile.path);
+      fs.unlinkSync(answerSheetFile.path);
+    } catch (cleanupError) {
+      console.warn("Failed to cleanup temporary upload files", cleanupError);
+    }
+
     const extractedData = await callGemini({
-      question_paper: questionPaperFile.buffer,
-      answer_sheet: answerSheetFile.buffer,
+      question_paper: questionPaperBuffer,
+      answer_sheet: answerSheetBuffer,
       question_paper_mime_type: questionPaperFile.mimetype,
       answer_sheet_mime_type: answerSheetFile.mimetype,
       question_paper_name: questionPaperFile.originalname,
@@ -49,6 +60,7 @@ export async function analyzeExam(req, res) {
             "exam_type": "UT-1 or UT-2 or Mid-Term or Final",
             "total_marks": 0
           },
+          "transcription_confidence": 0.95,
           "questions": [
             {
               "question_no": 1,
@@ -81,6 +93,7 @@ export async function analyzeExam(req, res) {
         }
 
         Rules:
+        - transcription_confidence: a float between 0.0 and 1.0 indicating how confident you are in reading the student's handwriting
         - status values: "fully_correct" | "partially_correct" | "completely_wrong" | "not_attempted"
         - sub_topic status: "crystal_clear" | "partial_understanding" | "no_knowledge"
         - marks_scored per question must be accurate - do NOT calculate total yourself
@@ -103,6 +116,12 @@ export async function analyzeExam(req, res) {
       throw new Error(
         "Gemini did not return any question analysis from the uploaded answer sheet.",
       );
+    }
+
+    const confidence = Number(extractedData.transcription_confidence);
+    const needsManualReview = !Number.isNaN(confidence) && confidence < 0.8;
+    if (needsManualReview) {
+      console.warn("Low transcription confidence detected (< 80%). Flagging exam for manual review.");
     }
 
     extractedData.student_info = extractedStudentInfo;
@@ -245,6 +264,7 @@ export async function analyzeExam(req, res) {
         normalizedGeminiResponse.comparison_with_history ?? null,
       total_scored: calculatedTotalScored,
       percentage: calculatedPercentage,
+      needs_manual_review: needsManualReview,
     };
 
     console.log(
@@ -294,6 +314,7 @@ export async function analyzeExam(req, res) {
           finalAnalysis?.ai_recommendation?.suggested_goal || null,
       },
       comparison_with_history: finalAnalysis.comparison_with_history,
+      needs_manual_review: finalAnalysis.needs_manual_review,
       student_id: finalAnalysis.student_id || null,
       exam_id: finalAnalysis.exam_id || null,
       used_fallback_student:
@@ -490,7 +511,7 @@ function normalizeExtractedQuestions(questions) {
       const marksAvailable = normalizeNonNegativeNumber(
         question?.marks_available,
       );
-      let marksScored = normalizeNonNegativeNumber(question?.marks_scored);
+      let marksScored = Math.round(normalizeNonNegativeNumber(question?.marks_scored));
 
       if (marksScored > marksAvailable) {
         console.warn(

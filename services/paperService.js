@@ -1,5 +1,5 @@
+import "../utils/loadEnv.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 
 const MAX_GENERATION_ATTEMPTS = 3;
@@ -7,7 +7,7 @@ const UT_EXAM_TYPES = new Set(["UT-1", "UT-2"]);
 const TERM_EXAM_TYPES = new Set(["Mid-Term", "Final"]);
 const DEFAULT_UT_TOTAL_MARKS = 25;
 const DEFAULT_UT_NUM_QUESTIONS = 10;
-const MIN_UT_TOTAL_MARKS = 10;
+const MIN_UT_TOTAL_MARKS = 5;
 const MAX_UT_TOTAL_MARKS = 30;
 const MAX_UT_SINGLE_QUESTION_MARKS = 5;
 const MIN_UT_NUM_QUESTIONS = 1;
@@ -478,8 +478,8 @@ function validateGeneratedPaper(paperJSON, context) {
       errors.push(`question_no must be sequential starting from 1`);
     }
 
-    if (!Number.isFinite(question.marks) || question.marks <= 0) {
-      errors.push(`Q${questionNumber} has invalid marks`);
+    if (!Number.isInteger(question.marks) || question.marks <= 0) {
+      errors.push(`Q${questionNumber} has invalid marks. Marks must be positive whole numbers (e.g., 1, 2, 3). Decimals/fractions are NOT allowed.`);
     }
 
     if (!question.question_text) {
@@ -914,10 +914,10 @@ Strict paper rules:
 
 Paper pattern:
 - Prefer the common school pattern of 25 marks for periodic/unit tests
-- Use exactly ${totalMarks} total marks
 - Duration should remain suitable for a school periodic/unit test
-- Total questions: ${numQuestions} only
-- Total marks must add up to exactly ${totalMarks}
+- Total questions: MUST BE EXACTLY ${numQuestions}. Do NOT generate any extra questions.
+- Marks MUST BE STRICTLY WHOLE NUMBERS (1, 2, 3, 4, 5). NEVER use fractions or decimals like 0.5 or 1.5.
+- Total marks must add up to exactly ${totalMarks}.
 - Every provided chapter/topic must appear in the paper at least once
 - Use a realistic mix of 2, 3, 4 and 5 mark questions
 - Include at least one descriptive question worth 4 or 5 marks
@@ -925,6 +925,7 @@ Paper pattern:
 - Never create a 10-mark single question in a periodic/unit test paper
 - Maximum MCQs: ${getUTMcqLimit(subject)}
 - Avoid MCQ-heavy pattern
+- IMPORTANT: For MCQs, explicitly randomize the correct option across A, B, C, and D so they don't always default to the first option.
 
 Subject guidance:
 - Language subjects: include literature, grammar, comprehension, and writing as appropriate
@@ -948,6 +949,7 @@ Output rules:
 - No extra text before or after JSON
 - source_chapter is validation metadata only; do not print it in the question text
 - source_chapter must exactly match one of the provided chapter/topic strings
+- Allowed question_type values only: "MCQ", "short", "long"
 
 JSON shape:
 {
@@ -955,6 +957,10 @@ JSON shape:
     "instruction 1",
     "instruction 2"
   ],
+  "answer_key": {
+    "1": "brief correct answer or option",
+    "2": "brief correct answer or points"
+  },
   "questions": [
     {
       "question_no": 1,
@@ -991,8 +997,6 @@ JSON shape:
     }
   ]
 }
-
-Allowed question_type values only: "MCQ", "short", "long"
   `;
 }
 
@@ -1036,10 +1040,13 @@ IMPORTANT RULES:
 - Cover the supplied syllabus in a balanced way
 - Include internal choice only where it feels natural and minimal
 - Use question styles appropriate to the subject: numericals, theory, short answer, long answer, application, diagrams, proofs, grammar, writing etc.
+- Total questions: MUST BE EXACTLY ${numQuestions}.
 - Total marks must add up to exactly ${totalMarks}
+- Marks MUST BE STRICTLY WHOLE NUMBERS (1, 2, 3, 4, 5, 10, etc.). NEVER use fractions or decimals.
 - Use a realistic mix of short, medium, and long questions rather than a rigid board blueprint
 - source_chapter is validation metadata only; do not print it in the question text
 - source_chapter must exactly match one of the provided chapter/topic strings
+- IMPORTANT: For MCQs, explicitly randomize the correct option across A, B, C, and D so they don't always default to the first option.
 
 Return ONLY a valid JSON object. No markdown. No explanation.
 
@@ -1048,6 +1055,10 @@ Return ONLY a valid JSON object. No markdown. No explanation.
     "Answer all questions.",
     "Show all necessary working clearly."
   ],
+  "answer_key": {
+    "1": "brief correct answer",
+    "2": "brief correct answer points"
+  },
   "questions": [
     {
       "question_no": 1,
@@ -1103,12 +1114,14 @@ IMPORTANT RULES:
 - Section D: 4 questions of 5 marks each = 20 marks (with internal choice)
 - Section E: 3 case-based questions of 4 marks each = 12 marks
 - Total = 80 marks exactly
+- Marks MUST BE STRICTLY WHOLE NUMBERS. NEVER use fractions or decimals.
 - All chapters must be covered across sections
 - Questions must be realistic and curriculum-appropriate for Class ${stdClass}
 - Section D must have internal choice
 - Section E must have a case passage followed by sub-questions
 - source_chapter is validation metadata only; do not print it in the question text
 - source_chapter must exactly match one of the provided chapter/topic strings
+- IMPORTANT: For MCQs, explicitly randomize the correct option across A, B, C, and D so they don't always default to the first option.
 
 Return ONLY a valid JSON object. No markdown. No explanation.
 
@@ -1119,6 +1132,10 @@ Return ONLY a valid JSON object. No markdown. No explanation.
     "Section E has case-based questions.",
     "Use of calculator is not permitted."
   ],
+  "answer_key": {
+    "1": "A",
+    "36": "brief correct answer points"
+  },
   "questions": [
     {
       "question_no": 1,

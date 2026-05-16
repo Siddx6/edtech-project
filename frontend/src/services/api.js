@@ -152,12 +152,12 @@ export async function getTeacherAnalytics() {
 }
 
 /**
- * Get student by name
- * @param {string} studentName - Student name
+ * Get student by ID
+ * @param {string} studentId - Student ID
  * @returns {Promise<Object>} - Student object
  */
-export async function getStudentByName(studentName) {
-  const response = await apiCall(`${API_V1}/student/${studentName}`);
+export async function getStudentById(studentId) {
+  const response = await apiCall(`${API_V1}/student/${studentId}`);
   return response.data;
 }
 
@@ -219,7 +219,7 @@ export default {
   getStudents,
   getStudentOverview,
   getTeacherAnalytics,
-  getStudentByName,
+  getStudentById,
   generatePracticeQuiz,
   // Helpers
   triggerPDFDownload,
