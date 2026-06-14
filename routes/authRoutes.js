@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import "../utils/loadEnv.js";
 import bcrypt from "bcryptjs";
+import Student from "../models/Student.js";
 
 const router = express.Router();
 
@@ -21,6 +22,28 @@ router.post("/signup", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    let studentId = null;
+
+    if (role === "student") {
+      // Check if Student record already exists
+      let student = await Student.findOne({
+        name: name.trim(),
+        class: userClass,
+      });
+
+      // If not, create one
+      if (!student) {
+        student = await Student.create({
+          name: name.trim(),
+          class: userClass,
+          school: req.body.school || "Unknown",
+        });
+      }
+
+      studentId = student._id;
+    }
+
     const user = await User.create({
       name,
       email,
@@ -28,6 +51,7 @@ router.post("/signup", async (req, res) => {
       role,
       class: userClass || null,
       subject: subject || null,
+      student_id: studentId,
     });
 
     const token = jwt.sign(
