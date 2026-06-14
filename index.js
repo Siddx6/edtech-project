@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import "./utils/loadEnv.js";
 import examRoutes from "./routes/examRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -28,6 +29,7 @@ mongoose
 // Routes
 app.use("/api", examRoutes);
 app.use("/api/v1", studentRoutes);
+app.use("/api/auth", authRoutes);
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");

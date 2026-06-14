@@ -1,6 +1,7 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Sidebar from "./components/Sidebar";
 import { useAppContext } from "./context/AppContext";
 import TeacherDashboard from "./pages/TeacherDashboard";
@@ -15,10 +16,65 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import QuizPage from "./pages/QuizPage";
 import PerformancePage from "./pages/PerformancePage";
 import RecommendationsPage from "./pages/RecommendationsPage";
+import LoginPage from "./pages/LoginPage";
+import AdminPage from "./pages/AdminPage";
 import "./App.css";
 
 function App() {
-  const { userRole, setUserRole } = useAppContext();
+  const { userRole, setUserRole, userToken, setUserToken } = useAppContext();
+
+  const handleLoginSuccess = (token, user) => {
+    setUserToken(token);
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+
+    if (user.role === "admin") {
+      setUserRole("admin");
+    } else if (user.role === "teacher") {
+      setUserRole("teacher");
+    } else {
+      setUserRole("student");
+    }
+  };
+
+  const handleLogout = () => {
+    setUserToken(null);
+    setUserRole("student");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  };
+
+  if (!userToken) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Admin gets their own layout
+  if (userRole === "admin") {
+    return (
+      <Router>
+        <div className="app-container">
+          <Navbar
+            userRole={userRole}
+            onRoleToggle={() => {}}
+            onLogout={handleLogout}
+          />
+          <div className="main-content">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </div>
+        </div>
+      </Router>
+    );
+  }
 
   const toggleRole = (role) => {
     setUserRole(role);
@@ -27,7 +83,11 @@ function App() {
   return (
     <Router>
       <div className="app-container">
-        <Navbar userRole={userRole} onRoleToggle={toggleRole} />
+        <Navbar
+          userRole={userRole}
+          onRoleToggle={toggleRole}
+          onLogout={handleLogout}
+        />
         <div className="main-content">
           <Sidebar userRole={userRole} />
           <Routes>

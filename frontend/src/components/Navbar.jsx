@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Bell, Settings, LogOut } from "lucide-react";
 import "./Navbar.css";
 
-function Navbar({ userRole, onRoleToggle }) {
+function Navbar({ userRole, onRoleToggle, onLogout }) {
   return (
     <nav className="navbar">
       <div className="navbar-container">
@@ -55,7 +55,7 @@ function Navbar({ userRole, onRoleToggle }) {
           <button className="navbar-icon-btn">
             <Settings size={20} />
           </button>
-          <button className="navbar-icon-btn">
+          <button className="navbar-icon-btn" onClick={onLogout} title="Logout">
             <LogOut size={20} />
           </button>
         </div>
